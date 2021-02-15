@@ -194,3 +194,66 @@ def compress_hyper(cubes, model, ckpt_dir, decompress=False):
         return y_strings, y_min_vs, y_max_vs, y_shape, z_strings, z_min_v, z_max_v, z_shape, x_decodeds
 
     return y_strings, y_min_vs, y_max_vs, y_shape, z_strings, z_min_v, z_max_v, z_shape
+
+
+
+def decompress_hyper(y_strings, y_min_vs, y_max_vs, y_shape, z_strings, z_min_v, z_max_v, z_shape, model, ckpt_dir):
+    """Decompress bitstream to cubes.
+    Input: compressed bitstream. latent representations (y) and hyper prior (z).
+    Output: cubes with shape [batch size, length, width, height, channel(1)]
+    """
+    print('===== Decompress =====')
+    # load model.
+    #model = importlib.import_module(model)
+    synthesis_transform = model.SynthesisTransform()
+    hyper_encoder = model.HyperEncoder()
+    hyper_decoder = model.HyperDecoder()
+    entropy_bottleneck = EntropyBottleneck()
+    conditional_entropy_model = SymmetricConditional()
+
+    checkpoint = tf.train.Checkpoint(synthesis_transform=synthesis_transform, 
+                                    hyper_encoder=hyper_encoder, 
+                                    hyper_decoder=hyper_decoder, 
+                                    estimator=entropy_bottleneck)
+    status = checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
+
+    start = time.time()
+    zs = entropy_bottleneck.decompress(z_strings, z_min_v, z_max_v, z_shape, z_shape[-1])
+    print("Entropy Decoder (Hyper): {}s".format(round(time.time()-start, 4)))
+
+    def loop_hyper_deocder(z):
+        z = tf.expand_dims(z, 0)
+        loc, scale = hyper_decoder(z)
+        return tf.squeeze(loc, [0]), tf.squeeze(scale, [0])
+
+    start = time.time()
+    locs, scales = tf.map_fn(loop_hyper_deocder, zs, dtype=(tf.float32, tf.float32),
+                          parallel_iterations=1, back_prop=False)
+    lower_bound = 1e-9# TODO
+    scales = tf.maximum(scales, lower_bound)
+    print("Hyper Decoder: {}s".format(round(time.time()-start, 4)))
+
+    start = time.time()
+    # ys = conditional_entropy_model.decompress(y_strings, locs, scales, y_min_v, y_max_v, y_shape)
+    def loop_range_decode(args):
+        y_string, loc, scale, y_min_v, y_max_v = args
+        loc = tf.expand_dims(loc, 0)
+        scale = tf.expand_dims(scale, 0)
+        y_decoded = conditional_entropy_model.decompress(y_string, loc, scale, y_min_v, y_max_v, y_shape)
+        return tf.squeeze(y_decoded, 0)
+
+  
+    args = (y_strings, locs, scales, y_min_vs, y_max_vs)
+    ys = tf.map_fn(loop_range_decode, args, dtype=tf.float32, parallel_iterations=1, back_prop=False)
+    print("Entropy Decoder: {}s".format(round(time.time()-start, 4)))
+
+    def loop_synthesis(y):
+        y = tf.expand_dims(y, 0)
+        x = synthesis_transform(y)
+        return tf.squeeze(x, [0])
+
+    start = time.time()
+    xs = tf.map_fn(loop_synthesis, ys, dtype=tf.float32, parallel_iterations=1, back_prop=False)
+    print("Synthesis Transform: {}s".format(round(time.time()-start, 4)))
+
+    return xs
