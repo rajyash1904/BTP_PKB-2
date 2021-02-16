@@ -4,6 +4,10 @@ import sys
 import time
 import random
 
+# sys.path.append('.')
+from dataprocess.inout_points import load_ply_data, write_ply_data, load_points, save_points, points2voxels, voxels2points, select_voxels
+
+
 
 def preprocess(input_file, scale, cube_size, min_num) :
 
