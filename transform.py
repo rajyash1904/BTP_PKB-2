@@ -27,7 +27,7 @@ def compress_factorized(cubes, model, ckpt_dir):
     analysis_transform = model.AnalysisTransform()
     # synthesis_transform = model.SynthesisTransform()
     entropy_bottleneck = EntropyBottleneck()
-    checkpoint = tf.train.checkpoint(analysis_transform=analysis_transform, estimator=entropy_bottleneck)
+    checkpoint = tf.train.Checkpoint(analysis_transform=analysis_transform, estimator=entropy_bottleneck)
     status = checkpoint.restore(tf.train.latest_checkpoint(ckpt_dir))
 
 
