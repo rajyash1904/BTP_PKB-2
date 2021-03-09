@@ -102,8 +102,8 @@ if __name__ == "__main__":
 
   n_points = int(4e5)
   resolution = 255
-  root_mesh_dir = '/home/ubuntu/HardDisk1/ShapeNetCore.v2/02747177/1b7d468a27208ee3dad910e221d16b18/models/'
-  root_points_dir = '/home/ubuntu/HardDisk1/shapenet255/'
+  root_mesh_dir = 'E:/BTP_DATASETS/ShapeNetCore.v2/02747177/1b7d468a27208ee3dad910e221d16b18/models'
+  root_points_dir = 'E:/BTP_DATASETS/shapeNet255'
   if not os.path.exists(root_points_dir):
     os.makedirs(root_points_dir)
 
