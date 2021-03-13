@@ -2,7 +2,7 @@
 
 # dependencies
 /checkpoints
-
+/compressed
 # python
 /__pycache__
 
